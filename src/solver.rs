@@ -1,12 +1,19 @@
-type Square = [[Option<Value>; 3]; 3];
-type Grid = [[Square; 3]; 3];
+use crate::pretty_print;
+use std::thread::sleep;
+use std::time::Duration;
+
+const SLEEP_TIME: Duration = Duration::from_millis(200);
+
+pub type Square = [[Option<Value>; 3]; 3];
+pub type Grid = [[Square; 3]; 3];
 
 pub struct Solver<'a> {
-    grid: &'a mut Grid,
+    pub grid: &'a mut Grid,
     row: usize,
     col: usize,
     s_row: usize,
     s_col: usize,
+    debug: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -16,13 +23,14 @@ pub enum SolveResult {
 }
 
 impl<'a> Solver<'a> {
-    pub fn new(grid: &'a mut Grid) -> Solver<'a> {
+    pub fn new(grid: &'a mut Grid, debug: bool) -> Solver<'a> {
         Solver {
             grid,
             row: 0,
             col: 0,
             s_row: 0,
             s_col: 0,
+            debug,
         }
     }
 
@@ -38,6 +46,11 @@ impl<'a> Solver<'a> {
         }
 
         for num in self.list_correct().iter() {
+            if self.debug {
+                pretty_print(self.grid);
+                sleep(SLEEP_TIME);
+                print!("\x1b[2J");
+            }
             self.change_pos_to(Some(Value::Maybe(*num)));
             self.next();
             match self.rec_solve() {
@@ -68,7 +81,7 @@ impl<'a> Solver<'a> {
             .flatten()
             .flatten()
             .flatten()
-            .any(|val| val == &None)
+            .any(|val| val.is_none())
     }
 
     fn change_pos_to(&mut self, val: Option<Value>) {
@@ -79,9 +92,7 @@ impl<'a> Solver<'a> {
         if let Err(()) = special_add(&mut self.s_col) {
             if let Err(()) = special_add(&mut self.s_row) {
                 if let Err(()) = special_add(&mut self.col) {
-                    if let Err(()) = special_add(&mut self.row) {
-                        //                       println!("at end");
-                    }
+                    let _ = special_add(&mut self.row);
                 }
             }
         }
@@ -102,10 +113,10 @@ impl<'a> Solver<'a> {
         if !square_need(&self.grid[self.row][self.col], n) {
             return false;
         }
-        if is_in_grid_row(&self.grid, self.row * 3 + self.s_row, n) {
+        if self.is_in_grid_row(n) {
             return false;
         }
-        if is_in_grid_col(&self.grid, self.col * 3 + self.s_col, n) {
+        if self.is_in_grid_col(n) {
             return false;
         }
         true
@@ -121,6 +132,16 @@ impl<'a> Solver<'a> {
 
         //println!("possible nums: {out:?}");
         out
+    }
+    fn is_in_grid_row(&self, val: &u8) -> bool {
+        self.grid[self.row]
+            .iter()
+            .any(|s| is_in_row(s, self.s_row, val))
+    }
+    fn is_in_grid_col(&self, val: &u8) -> bool {
+        self.grid
+            .iter()
+            .any(|row| is_in_col(&row[self.col], self.s_col, val))
     }
 }
 
@@ -147,65 +168,36 @@ fn special_sub(n: &mut usize) -> Result<(), ()> {
 fn is_in_row(s: &Square, i: usize, val: &u8) -> bool {
     s[i].iter()
         .filter(|v| v.is_some())
-        .any(|v| &unwrap_val(&v.unwrap()) == val)
+        .any(|v| &v.unwrap().unwrap() == val)
 }
 
 fn is_in_col(s: &Square, i: usize, val: &u8) -> bool {
     s.iter()
         .filter(|col| col[i].is_some())
-        .find(|col| &unwrap_val(&col[i].unwrap()) == val)
-        .is_some()
-}
-
-fn is_in_grid_row(g: &Grid, i: usize, val: &u8) -> bool {
-    let r_index = i / 3;
-    let s_index = i % 3;
-    g[r_index]
-        .iter()
-        .find(|s| is_in_row(s, s_index, val))
-        .is_some()
-}
-
-fn is_in_grid_col(g: &Grid, i: usize, val: &u8) -> bool {
-    g.iter()
-        .find(|row| is_in_col(&row[i / 3], i % 3, val))
-        .is_some()
-}
-
-fn pretty_print(g: &Grid) {
-    for row in g.iter() {
-        println!("{}", "-".repeat(27));
-        for i in 0..3 {
-            row.iter().for_each(|l| print!("{:?}", l[i]));
-            println!();
-        }
-    }
+        .any(|col| &col[i].unwrap().unwrap() == val)
 }
 
 fn square_need(s: &Square, n: &u8) -> bool {
-    for row in s.iter() {
-        for cell in row.iter() {
-            if let Some(val) = cell {
-                if &unwrap_val(val) == n {
-                    return false;
-                }
-            }
+    for cell in s.iter().flatten().flatten() {
+        if &cell.unwrap() == n {
+            return false;
         }
     }
 
     true
 }
-
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Value {
     Maybe(u8),
     Definite(u8),
 }
 
-fn unwrap_val(val: &Value) -> u8 {
-    match val {
-        Value::Maybe(v) => *v,
-        Value::Definite(v) => *v,
+impl Value {
+    pub fn unwrap(&self) -> u8 {
+        match self {
+            Value::Maybe(v) => *v,
+            Value::Definite(v) => *v,
+        }
     }
 }
 
@@ -365,31 +357,28 @@ mod tests {
 
     #[test]
     fn test_grid_row_check() {
-        let g = [[SQ2; 3]; 3];
-        assert!(is_in_grid_row(&TEST, 1, &7));
-        assert!(is_in_grid_row(&g, 3, &8));
-        assert!(is_in_grid_row(&g, 6, &7));
-        assert!(!is_in_grid_row(&g, 2, &8));
+        let mut test2 = TEST.clone();
+        let s = Solver::new(&mut test2, false);
+        assert!(s.is_in_grid_row(&6));
     }
     #[test]
     fn test_grid_col_check() {
-        let g = [[SQ2; 3]; 3];
-        assert!(is_in_grid_col(&g, 2, &7));
-        assert!(is_in_grid_col(&g, 6, &9));
-        assert!(!is_in_grid_col(&g, 2, &8));
+        let mut test2 = TEST.clone();
+        let s = Solver::new(&mut test2, false);
+        assert!(s.is_in_grid_col(&8));
     }
 
     #[test]
     fn test_is_full() {
         let mut test2 = TEST.clone();
-        let s = Solver::new(&mut test2);
+        let s = Solver::new(&mut test2, false);
         assert!(!s.is_full());
     }
 
     #[test]
     fn test_is_correct() {
         let mut test2 = TEST.clone();
-        let mut s = Solver::new(&mut test2);
+        let mut s = Solver::new(&mut test2, false);
         assert!(!s.is_correct(&1));
         drop(s.next());
         drop(s.next());
@@ -402,7 +391,7 @@ mod tests {
     #[test]
     fn test_this_val() {
         let mut test2 = TEST.clone();
-        let mut s = Solver::new(&mut test2);
+        let mut s = Solver::new(&mut test2, false);
         drop(s.next());
         drop(s.next());
         assert_eq!(s.this_val(), Some(Value::Definite(1)));
@@ -411,7 +400,7 @@ mod tests {
     #[test]
     fn test_solve() {
         let mut test2 = TEST.clone();
-        let mut solve = Solver::new(&mut test2);
+        let mut solve = Solver::new(&mut test2, false);
         solve.rec_solve();
         assert_eq!(solve.grid, &SOLVED);
     }
