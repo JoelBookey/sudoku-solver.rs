@@ -2,7 +2,7 @@ use crate::pretty_print;
 use std::thread::sleep;
 use std::time::Duration;
 
-const SLEEP_TIME: Duration = Duration::from_millis(200);
+const SLEEP_TIME: Duration = Duration::from_millis(1);
 
 pub type Square = [[Option<Value>; 3]; 3];
 pub type Grid = [[Square; 3]; 3];
