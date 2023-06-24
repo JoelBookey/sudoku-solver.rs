@@ -1,37 +1,56 @@
-use std::env;
+use clap::Parser;
 use sudoku_solver::parser::parse;
 use sudoku_solver::pretty_print;
 use sudoku_solver::solver::{SolveResult, Solver};
 
-fn main() -> Result<(), String> {
-    // println!("hello");
-    // println!("\x1b[93mGoodbye\x1b[0m");
+#[derive(Parser, Debug)]
+struct Args {
+    file_path: String,
+    arg_1: Option<String>,
+    arg_2: Option<String>,
+}
 
-    let args = env::args().collect::<Vec<String>>();
-    let path = args.get(1);
-    if path.is_none() {
-        return Err("please provide a file!".to_string());
-    }
-
-    let mut debug = false;
-    if let Some(arg) = args.get(2) {
-        if arg == "debug" {
-            debug = true;
-        } else {
-            return Err(format!("unexpected argument: {arg}").to_string());
+fn match_arg(s: Option<String>, debug: &mut bool, hard_solve: &mut bool) -> Result<(), String> {
+    match s {
+        None => {}
+        Some(s) => {
+            if s == String::from("--debug") {
+                *debug = true;
+            } else if s == String::from("--hard") {
+                *hard_solve = true;
+            } else {
+                return Err(format!("unexpected argument: {s}"));
+            }
         }
-    }
+    };
+    Ok(())
+}
 
-    let mut g = match parse(path.unwrap()) {
+fn main() -> Result<(), String> {
+    let args = Args::parse();
+    let file_path = args.file_path;
+    let mut debug = false;
+    let mut hard_solve = false;
+    match_arg(args.arg_1, &mut debug, &mut hard_solve)?;
+    match_arg(args.arg_2, &mut debug, &mut hard_solve)?;
+
+    let grid = match parse(&file_path) {
         Ok(val) => val,
         Err(e) => return Err(e.to_string()),
     };
 
-    let mut solver = Solver::new(&mut g, debug);
-    if solver.rec_solve() == SolveResult::Back {
+    let mut solver = Solver::new(grid, debug);
+    if hard_solve == true {
+        match solver.hard_solve() {
+            SolveResult::FailedSolve => return Err("could not solve".to_string()),
+            SolveResult::ManySolutions => return Err("multiple solutions found".to_string()),
+            _ => {}
+        }
+    } else if solver.solve() == SolveResult::FailedSolve {
         return Err("could not solve".to_string());
     }
-    pretty_print(solver.grid);
+    println!("SOLVED: ");
+    pretty_print(&solver.get_solved().unwrap());
 
     Ok(())
 }

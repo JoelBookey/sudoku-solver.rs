@@ -7,36 +7,68 @@ const SLEEP_TIME: Duration = Duration::from_millis(200);
 pub type Square = [[Option<Value>; 3]; 3];
 pub type Grid = [[Square; 3]; 3];
 
-pub struct Solver<'a> {
-    pub grid: &'a mut Grid,
+pub struct Solver {
+    pub grid: Grid,
+    solved: Grid,
     row: usize,
     col: usize,
     s_row: usize,
     s_col: usize,
     debug: bool,
+
+    // only used when using hard_solve
+    working_clone: Option<Grid>,
+    solution_found: bool,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum SolveResult {
-    Back,
-    Done,
+    Solved,
+    FailedSolve,
+    ManySolutions,
 }
 
-impl<'a> Solver<'a> {
-    pub fn new(grid: &'a mut Grid, debug: bool) -> Solver<'a> {
+// results of the recursive functions
+#[derive(Debug, PartialEq)]
+enum RecResult {
+    Back,
+    Done,
+    Error,
+}
+
+impl Solver {
+    pub fn new(grid: Grid, debug: bool) -> Solver {
         Solver {
             grid,
+            solved: grid,
             row: 0,
             col: 0,
             s_row: 0,
             s_col: 0,
+            solution_found: false,
+            working_clone: None,
             debug,
         }
     }
 
-    pub fn rec_solve(&mut self) -> SolveResult {
+    pub fn get_solved(&self) -> Option<Grid> {
+        if self.solved == self.grid {
+            return None;
+        }
+        Some(self.solved)
+    }
+
+    pub fn solve(&mut self) -> SolveResult {
+        match self.rec_solve() {
+            RecResult::Back => SolveResult::FailedSolve,
+            RecResult::Done => SolveResult::Solved,
+            _ => unreachable!(),
+        }
+    }
+
+    fn rec_solve(&mut self) -> RecResult {
         if self.is_full() {
-            return SolveResult::Done;
+            return RecResult::Done;
         }
         if let Some(Value::Definite(_)) = self.this_val() {
             self.next();
@@ -47,36 +79,103 @@ impl<'a> Solver<'a> {
 
         for num in self.list_correct().iter() {
             if self.debug {
-                pretty_print(self.grid);
+                println!("DEBUG: ");
+                pretty_print(&self.solved);
                 sleep(SLEEP_TIME);
-                print!("\x1b[2J");
             }
             self.change_pos_to(Some(Value::Maybe(*num)));
             self.next();
             match self.rec_solve() {
-                SolveResult::Back => {
+                RecResult::Back => {
                     self.back();
                     continue;
                 }
-                SolveResult::Done => {
+                RecResult::Done => {
                     self.back();
-                    return SolveResult::Done;
+                    return RecResult::Done;
                 }
+                _ => unreachable!(),
             }
         }
 
         self.change_pos_to(None);
 
-        SolveResult::Back
+        RecResult::Back
+    }
+
+    // this function takes significantly longer but it returns an error if there is multiple
+    // solutions
+    pub fn hard_solve(&mut self) -> SolveResult {
+        let res = self.hard_rec_solve();
+        if res == RecResult::Back && self.solution_found {
+            self.solved = self.working_clone.unwrap();
+            self.working_clone = None;
+            return SolveResult::Solved;
+        }
+        self.working_clone = None;
+        if res == RecResult::Error {
+            self.solved = self.grid;
+            return SolveResult::ManySolutions;
+        }
+
+        SolveResult::FailedSolve
+    }
+
+    fn hard_rec_solve(&mut self) -> RecResult {
+        if self.is_full() {
+            if self.solution_found {
+                return RecResult::Error;
+            }
+            self.working_clone = Some(self.solved);
+            self.solution_found = true;
+            self.back();
+            self.change_pos_to(None);
+            self.next();
+            return RecResult::Back;
+        }
+        if let Some(Value::Definite(_)) = self.this_val() {
+            self.next();
+            let val = self.hard_rec_solve();
+            self.back();
+            return val;
+        }
+
+        for num in self.list_correct().iter() {
+            if self.debug {
+                println!("DEBUG: ");
+                pretty_print(&self.solved);
+                sleep(SLEEP_TIME);
+                print!("\x1b[2J");
+            }
+            self.change_pos_to(Some(Value::Maybe(*num)));
+            self.next();
+            match self.hard_rec_solve() {
+                RecResult::Back => {
+                    self.back();
+                    continue;
+                }
+                RecResult::Done => {
+                    self.back();
+                    return RecResult::Done;
+                }
+                RecResult::Error => {
+                    self.back();
+                    return RecResult::Error;
+                }
+            }
+        }
+
+        self.change_pos_to(None);
+        RecResult::Back
     }
 
     fn this_val(&self) -> Option<Value> {
-        self.grid[self.row][self.col][self.s_row][self.s_col]
+        self.solved[self.row][self.col][self.s_row][self.s_col]
     }
 
     fn is_full(&self) -> bool {
         !self
-            .grid
+            .solved
             .iter()
             .flatten()
             .flatten()
@@ -85,7 +184,7 @@ impl<'a> Solver<'a> {
     }
 
     fn change_pos_to(&mut self, val: Option<Value>) {
-        self.grid[self.row][self.col][self.s_row][self.s_col] = val;
+        self.solved[self.row][self.col][self.s_row][self.s_col] = val;
     }
 
     fn next(&mut self) {
@@ -110,7 +209,7 @@ impl<'a> Solver<'a> {
         }
     }
     fn is_correct(&self, n: &u8) -> bool {
-        if !square_need(&self.grid[self.row][self.col], n) {
+        if !square_need(&self.solved[self.row][self.col], n) {
             return false;
         }
         if self.is_in_grid_row(n) {
@@ -134,12 +233,12 @@ impl<'a> Solver<'a> {
         out
     }
     fn is_in_grid_row(&self, val: &u8) -> bool {
-        self.grid[self.row]
+        self.solved[self.row]
             .iter()
             .any(|s| is_in_row(s, self.s_row, val))
     }
     fn is_in_grid_col(&self, val: &u8) -> bool {
-        self.grid
+        self.solved
             .iter()
             .any(|row| is_in_col(&row[self.col], self.s_col, val))
     }
@@ -357,32 +456,28 @@ mod tests {
 
     #[test]
     fn test_grid_row_check() {
-        let mut test2 = TEST.clone();
-        let s = Solver::new(&mut test2, false);
+        let s = Solver::new(TEST, false);
         assert!(s.is_in_grid_row(&6));
     }
     #[test]
     fn test_grid_col_check() {
-        let mut test2 = TEST.clone();
-        let s = Solver::new(&mut test2, false);
+        let s = Solver::new(TEST, false);
         assert!(s.is_in_grid_col(&8));
     }
 
     #[test]
     fn test_is_full() {
-        let mut test2 = TEST.clone();
-        let s = Solver::new(&mut test2, false);
+        let s = Solver::new(TEST, false);
         assert!(!s.is_full());
     }
 
     #[test]
     fn test_is_correct() {
-        let mut test2 = TEST.clone();
-        let mut s = Solver::new(&mut test2, false);
+        let mut s = Solver::new(TEST, false);
         assert!(!s.is_correct(&1));
-        drop(s.next());
-        drop(s.next());
-        drop(s.next());
+        s.next();
+        s.next();
+        s.next();
         //println!("this val: {:?}", s.this_val());
         //println!("{:?}", (s.s_col, s.s_row));
         assert!(!s.is_correct(&7));
@@ -390,18 +485,16 @@ mod tests {
 
     #[test]
     fn test_this_val() {
-        let mut test2 = TEST.clone();
-        let mut s = Solver::new(&mut test2, false);
-        drop(s.next());
-        drop(s.next());
+        let mut s = Solver::new(TEST, false);
+        s.next();
+        s.next();
         assert_eq!(s.this_val(), Some(Value::Definite(1)));
     }
 
     #[test]
     fn test_solve() {
-        let mut test2 = TEST.clone();
-        let mut solve = Solver::new(&mut test2, false);
+        let mut solve = Solver::new(TEST, false);
         solve.rec_solve();
-        assert_eq!(solve.grid, &SOLVED);
+        assert_eq!(&solve.get_solved().unwrap(), &SOLVED);
     }
 }
