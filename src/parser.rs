@@ -1,4 +1,4 @@
-use crate::solver::{Grid, Value};
+use crate::{Grid, Value};
 use std::error::Error;
 use std::{fmt, fs};
 

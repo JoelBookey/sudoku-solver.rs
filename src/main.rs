@@ -14,9 +14,9 @@ fn match_arg(s: Option<String>, debug: &mut bool, hard_solve: &mut bool) -> Resu
     match s {
         None => {}
         Some(s) => {
-            if s == String::from("--debug") {
+            if s == *"--debug" {
                 *debug = true;
-            } else if s == String::from("--hard") {
+            } else if s == *"--hard" {
                 *hard_solve = true;
             } else {
                 return Err(format!("unexpected argument: {s}"));
@@ -40,7 +40,7 @@ fn main() -> Result<(), String> {
     };
 
     let mut solver = Solver::new(grid, debug);
-    if hard_solve == true {
+    if hard_solve {
         match solver.hard_solve() {
             SolveResult::FailedSolve => return Err("could not solve".to_string()),
             SolveResult::ManySolutions => return Err("multiple solutions found".to_string()),
