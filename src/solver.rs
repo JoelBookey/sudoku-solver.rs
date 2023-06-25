@@ -1,8 +1,9 @@
-use crate::{is_in_col, is_in_row, pretty_print, square_need, Grid, Value};
+use crate::grid::{is_full, is_in_col, is_in_row, square_need, Grid, Value};
+use crate::{pretty_print, special_add, special_sub};
 use std::thread::sleep;
 use std::time::Duration;
 
-const SLEEP_TIME: Duration = Duration::from_millis(200);
+const SLEEP_TIME: Duration = Duration::from_nanos(2);
 
 pub struct Solver {
     grid: Grid,
@@ -56,6 +57,7 @@ impl Solver {
     }
 
     pub fn solve(&mut self) -> SolveResult {
+        self.solved = self.grid.clone();
         match self.rec_solve() {
             RecResult::Back => SolveResult::FailedSolve,
             RecResult::Done => SolveResult::Solved,
@@ -64,7 +66,7 @@ impl Solver {
     }
 
     fn rec_solve(&mut self) -> RecResult {
-        if self.is_full() {
+        if is_full(&self.solved) {
             return RecResult::Done;
         }
         if let Some(Value::Definite(_)) = self.this_val() {
@@ -103,6 +105,7 @@ impl Solver {
     // this function takes significantly longer but it returns an error if there is multiple
     // solutions
     pub fn hard_solve(&mut self) -> SolveResult {
+        self.solved = self.grid.clone();
         let res = self.hard_rec_solve();
         if res == RecResult::Back && self.solution_found {
             self.solved = self.working_clone.unwrap();
@@ -119,7 +122,7 @@ impl Solver {
     }
 
     fn hard_rec_solve(&mut self) -> RecResult {
-        if self.is_full() {
+        if is_full(&self.solved) {
             if self.solution_found {
                 return RecResult::Error;
             }
@@ -168,16 +171,6 @@ impl Solver {
 
     fn this_val(&self) -> Option<Value> {
         self.solved[self.row][self.col][self.s_row][self.s_col]
-    }
-
-    fn is_full(&self) -> bool {
-        !self
-            .solved
-            .iter()
-            .flatten()
-            .flatten()
-            .flatten()
-            .any(|val| val.is_none())
     }
 
     fn change_pos_to(&mut self, val: Option<Value>) {
@@ -241,34 +234,14 @@ impl Solver {
     }
 }
 
-fn special_add(n: &mut usize) -> Result<(), ()> {
-    if *n == 2 {
-        *n = 0;
-        return Err(());
-    }
-
-    *n += 1;
-    Ok(())
-}
-
-fn special_sub(n: &mut usize) -> Result<(), ()> {
-    if *n as isize - 1 < 0 {
-        *n = 2;
-        return Err(());
-    }
-
-    *n -= 1;
-    Ok(())
-}
-
 const NUMS: [u8; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 
     use super::*;
 
-    const TEST: Grid = [
+    pub const TEST: Grid = [
         [
             [
                 [None, None, Some(Value::Definite(1))],
@@ -397,12 +370,6 @@ mod tests {
     fn test_grid_col_check() {
         let s = Solver::new(TEST, false);
         assert!(s.is_in_grid_col(&8));
-    }
-
-    #[test]
-    fn test_is_full() {
-        let s = Solver::new(TEST, false);
-        assert!(!s.is_full());
     }
 
     #[test]

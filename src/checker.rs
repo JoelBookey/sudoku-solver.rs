@@ -1,4 +1,4 @@
-use crate::{is_in_col, is_in_row, square_need, Grid};
+use crate::grid::{is_in_col, is_in_row, square_need, Grid};
 
 pub fn check_grid(grid: &Grid) -> bool {
     for (row_index, row) in grid.iter().enumerate() {
