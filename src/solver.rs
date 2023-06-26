@@ -139,10 +139,8 @@ impl Solver {
             self.back();
             return val;
         }
-
         for num in self.list_correct().iter() {
             if self.debug {
-                println!("DEBUG: ");
                 pretty_print(&self.solved);
                 sleep(SLEEP_TIME);
                 print!("\x1b[2J");

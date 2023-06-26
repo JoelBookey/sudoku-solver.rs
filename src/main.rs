@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::time::Instant;
 use sudoku_solver::checker::check_grid;
 use sudoku_solver::creator::create_grid;
 use sudoku_solver::parser::parse;
@@ -72,10 +73,12 @@ fn main() -> Result<(), String> {
         if debug || hard_solve {
             return Err(format!("can not use that option with this command"));
         }
+        let now = Instant::now();
         let grid = create_grid();
         pretty_print(&grid);
+        println!("Took: {:?}", now.elapsed());
     } else {
-        return Err("you cannot use that argument with this command".to_string());
+        return Err("NOT A COMMMAND!!".to_string());
     }
 
     Ok(())

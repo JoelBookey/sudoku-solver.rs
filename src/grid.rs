@@ -38,6 +38,17 @@ pub fn square_need(s: &Square, n: &u8) -> bool {
     true
 }
 
+pub fn make_definite(grid: &Grid) -> Grid {
+    let mut grid = grid.clone();
+    for val in grid.iter_mut().flatten().flatten().flatten() {
+        if val != &None {
+            *val = Some(Value::Definite(val.unwrap().unwrap()));
+        }
+    }
+
+    grid
+}
+
 pub fn is_full(grid: &Grid) -> bool {
     !grid
         .iter()

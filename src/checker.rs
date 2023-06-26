@@ -1,6 +1,9 @@
-use crate::grid::{is_in_col, is_in_row, square_need, Grid};
+use crate::grid::{is_full, is_in_col, is_in_row, square_need, Grid};
 
 pub fn check_grid(grid: &Grid) -> bool {
+    if !is_full(grid) {
+        return false;
+    }
     for (row_index, row) in grid.iter().enumerate() {
         for (col_index, square) in row.iter().enumerate() {
             for (s_row_i, s_row) in square.iter().enumerate() {
@@ -120,9 +123,5 @@ mod tests {
         let mut test = TEST.clone();
         test[0][0][1][2] = Some(Value::Definite(1));
         assert!(!check_grid(&test));
-    }
-    #[test]
-    fn correct_check() {
-        assert!(check_grid(&TEST));
     }
 }

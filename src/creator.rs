@@ -1,17 +1,47 @@
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
+
 use crate::{
-    grid::{is_in_col, is_in_row, square_need, Grid, Value},
+    grid::{is_in_col, is_in_row, make_definite, square_need, Grid, Value},
     solver::{SolveResult, Solver},
 };
 use rand::{seq::SliceRandom, Rng};
 
+fn solve_handler(grid: Grid, time: Duration) -> SolveResult {
+    let now = Instant::now();
+    let handle = thread::spawn(move || {
+        let mut solver = Solver::new(grid.clone(), false);
+        return solver.solve();
+    });
+    loop {
+        if handle.is_finished() {
+            return handle.join().unwrap();
+        }
+        if now.elapsed() > time {
+            return SolveResult::FailedSolve;
+        }
+    }
+}
+
 fn full_grid() -> Grid {
     let mut thread = rand::thread_rng();
     let mut grid = [[[[None; 3]; 3]; 3]; 3];
+    let mut last_solve = SolveResult::FailedSolve;
+    let mut i = 0;
     loop {
         let indexes = indexes_of_none(&grid);
         if indexes.len() == 0 {
             break;
         }
+        if last_solve == SolveResult::Solved && i > 15 {
+            let mut solver = Solver::new(grid, false);
+            assert!(solver.solve() == SolveResult::Solved);
+            return make_definite(&solver.get_solved().unwrap());
+        }
+
+        i += 1;
         let random = thread.gen_range(0..indexes.len());
         let num: u8 = thread.gen_range(1..=9);
 
@@ -20,14 +50,12 @@ fn full_grid() -> Grid {
         if is_correct(num, &grid, row, col, s_row, s_col) {
             let mut grid_to_test = grid.clone();
             grid_to_test[row][col][s_row][s_col] = Some(Value::Definite(num));
-            let mut solver = Solver::new(grid_to_test, false);
-            println!("starting solve");
-            match solver.solve() {
+            last_solve = solve_handler(grid_to_test, Duration::from_secs(60));
+            match last_solve {
                 SolveResult::Solved => grid = grid_to_test,
                 SolveResult::FailedSolve => (),
                 SolveResult::ManySolutions => unreachable!(),
             }
-            println!("ended solve");
         }
     }
 
@@ -36,7 +64,6 @@ fn full_grid() -> Grid {
 
 pub fn create_grid() -> Grid {
     let mut grid = full_grid();
-    println!("full grid made");
     let mut rng = rand::thread_rng();
     let mut positions = POSSIBLE_POS.iter().map(|val| *val).collect::<IndexVec>();
     positions.shuffle(&mut rng);
@@ -48,7 +75,7 @@ pub fn create_grid() -> Grid {
         match solver.hard_solve() {
             SolveResult::Solved => grid = working_grid,
             SolveResult::ManySolutions => (),
-            SolveResult::FailedSolve => unreachable!(),
+            SolveResult::FailedSolve => panic!("falied solve?"),
         }
     }
 
@@ -183,5 +210,60 @@ mod tests {
         let grid = full_grid();
         pretty_print(&grid);
         assert!(check_grid(&grid))
+    }
+
+    use std::fs::File;
+    use std::io::Write;
+    use std::time::{Duration, Instant};
+
+    const ITERATIONS: usize = 5;
+
+    #[test]
+    fn test_create_grid() {
+        let mut file = File::create("timing.txt").unwrap();
+        let mut total = 0;
+        for _ in 0..ITERATIONS {
+            let time = time_creation().as_secs();
+            total += time;
+            let s = format!("TIME: {time}\n");
+            file.write_all(s.as_bytes()).unwrap();
+        }
+        let average = total / ITERATIONS as u64;
+        let s = format!("AVERAGE: {average}");
+        file.write_all(s.as_bytes()).unwrap();
+    }
+    #[test]
+    fn test_create_grid2() {
+        let mut file = File::create("timing2.txt").unwrap();
+        let mut total = 0;
+        for _ in 0..ITERATIONS {
+            let time = time_creation().as_secs();
+            total += time;
+            let s = format!("TIME: {time}\n");
+            file.write_all(s.as_bytes()).unwrap();
+        }
+        let average = total / ITERATIONS as u64;
+        let s = format!("AVERAGE: {average}");
+        file.write_all(s.as_bytes()).unwrap();
+    }
+    #[test]
+    fn test_create_grid3() {
+        let mut file = File::create("timing3.txt").unwrap();
+        let mut total = 0;
+        for _ in 0..ITERATIONS {
+            let time = time_creation().as_secs();
+            total += time;
+            let s = format!("TIME: {time}\n");
+            file.write_all(s.as_bytes()).unwrap();
+        }
+        let average = total / ITERATIONS as u64;
+        let s = format!("AVERAGE: {average}");
+        file.write_all(s.as_bytes()).unwrap();
+    }
+
+    fn time_creation() -> Duration {
+        let now = Instant::now();
+        let _ = create_grid();
+        now.elapsed()
     }
 }

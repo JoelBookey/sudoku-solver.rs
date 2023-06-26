@@ -14,7 +14,7 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::PathNotFound => write!(f, "Path Not Found"),
-            ParseError::InvalidLayout => write!(f, "Invalid sudoku layer"),
+            ParseError::InvalidLayout => write!(f, "Invalid sudoku layout"),
             ParseError::NotANumber => write!(f, "Came across not a number"),
             ParseError::Zero => write!(f, "Came across Zero"),
         }
