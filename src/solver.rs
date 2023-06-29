@@ -1,9 +1,5 @@
 use crate::grid::{is_full, is_in_col, is_in_row, square_need, Grid, Value};
-use crate::{pretty_print, special_add, special_sub};
-use std::thread::sleep;
-use std::time::Duration;
-
-const SLEEP_TIME: Duration = Duration::from_nanos(2);
+use crate::{special_add, special_sub};
 
 pub struct Solver {
     grid: Grid,
@@ -12,7 +8,6 @@ pub struct Solver {
     col: usize,
     s_row: usize,
     s_col: usize,
-    debug: bool,
 
     // only used when using hard_solve
     working_clone: Option<Grid>,
@@ -35,7 +30,7 @@ enum RecResult {
 }
 
 impl Solver {
-    pub fn new(grid: Grid, debug: bool) -> Solver {
+    pub fn new(grid: Grid) -> Solver {
         Solver {
             grid,
             solved: grid,
@@ -45,7 +40,6 @@ impl Solver {
             s_col: 0,
             solution_found: false,
             working_clone: None,
-            debug,
         }
     }
 
@@ -77,11 +71,6 @@ impl Solver {
         }
 
         for num in self.list_correct().iter() {
-            if self.debug {
-                println!("DEBUG: ");
-                pretty_print(&self.solved);
-                sleep(SLEEP_TIME);
-            }
             self.change_pos_to(Some(Value::Maybe(*num)));
             self.next();
             match self.rec_solve() {
@@ -140,11 +129,6 @@ impl Solver {
             return val;
         }
         for num in self.list_correct().iter() {
-            if self.debug {
-                pretty_print(&self.solved);
-                sleep(SLEEP_TIME);
-                print!("\x1b[2J");
-            }
             self.change_pos_to(Some(Value::Maybe(*num)));
             self.next();
             match self.hard_rec_solve() {
@@ -361,18 +345,18 @@ pub mod tests {
     ];
     #[test]
     fn test_grid_row_check() {
-        let s = Solver::new(TEST, false);
+        let s = Solver::new(TEST);
         assert!(s.is_in_grid_row(&6));
     }
     #[test]
     fn test_grid_col_check() {
-        let s = Solver::new(TEST, false);
+        let s = Solver::new(TEST);
         assert!(s.is_in_grid_col(&8));
     }
 
     #[test]
     fn test_is_correct() {
-        let mut s = Solver::new(TEST, false);
+        let mut s = Solver::new(TEST);
         assert!(!s.is_correct(&1));
         s.next();
         s.next();
@@ -384,7 +368,7 @@ pub mod tests {
 
     #[test]
     fn test_this_val() {
-        let mut s = Solver::new(TEST, false);
+        let mut s = Solver::new(TEST);
         s.next();
         s.next();
         assert_eq!(s.this_val(), Some(Value::Definite(1)));
@@ -392,7 +376,7 @@ pub mod tests {
 
     #[test]
     fn test_solve() {
-        let mut solve = Solver::new(TEST, false);
+        let mut solve = Solver::new(TEST);
         solve.rec_solve();
         assert_eq!(&solve.get_solved().unwrap(), &SOLVED);
     }

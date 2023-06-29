@@ -12,7 +12,7 @@ use rand::{seq::SliceRandom, Rng};
 fn solve_handler(grid: Grid, time: Duration) -> SolveResult {
     let now = Instant::now();
     let handle = thread::spawn(move || {
-        let mut solver = Solver::new(grid.clone(), false);
+        let mut solver = Solver::new(grid);
         return solver.solve();
     });
     loop {
@@ -36,7 +36,7 @@ fn full_grid() -> Grid {
             break;
         }
         if last_solve == SolveResult::Solved && i > 15 {
-            let mut solver = Solver::new(grid, false);
+            let mut solver = Solver::new(grid);
             assert!(solver.solve() == SolveResult::Solved);
             return make_definite(&solver.get_solved().unwrap());
         }
@@ -71,7 +71,7 @@ pub fn create_grid() -> Grid {
     while let Some(val) = positions.pop() {
         let mut working_grid = grid.clone();
         working_grid[val.0][val.1][val.2][val.3] = None;
-        let mut solver = Solver::new(working_grid, false);
+        let mut solver = Solver::new(working_grid);
         match solver.hard_solve() {
             SolveResult::Solved => grid = working_grid,
             SolveResult::ManySolutions => (),

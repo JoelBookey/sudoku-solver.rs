@@ -1,78 +1,54 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::time::Instant;
-use sudoku_solver::checker::check_grid;
-use sudoku_solver::creator::create_grid;
-use sudoku_solver::parser::parse;
-use sudoku_solver::pretty_print;
-use sudoku_solver::solver::{SolveResult, Solver};
+use sudoku::checker::check_grid;
+use sudoku::creator::create_grid;
+use sudoku::parser::parse;
+use sudoku::pretty_print;
+use sudoku::solver::{SolveResult, Solver};
 
 #[derive(Parser, Debug)]
-struct Args {
-    command: String,
-    file_path: Option<String>,
-    arg_1: Option<String>,
-    arg_2: Option<String>,
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn match_arg(s: Option<String>, debug: &mut bool, hard_solve: &mut bool) -> Result<(), String> {
-    match s {
-        None => {}
-        Some(s) => {
-            if s == *"--debug" {
-                *debug = true;
-            } else if s == *"--hard" {
-                *hard_solve = true;
-            } else {
-                return Err(format!("unexpected argument: {s}"));
-            }
-        }
-    };
-    Ok(())
+#[derive(Subcommand, Debug)]
+enum Commands {
+    // solve a sudoku puzzle
+    Solve { path: String },
+    // check if a sudoku puzzle is correct
+    Check { path: String },
+    // create a sudoku puzzle
+    Create,
 }
 
 fn main() -> Result<(), String> {
-    let args = Args::parse();
-    let file_path = args.file_path;
-    let command = args.command;
-
-    let mut debug = false;
-    let mut hard_solve = false;
-    match_arg(args.arg_1, &mut debug, &mut hard_solve)?;
-    match_arg(args.arg_2, &mut debug, &mut hard_solve)?;
-
-    if command == "solve" {
-        let grid = match parse(&file_path.unwrap()) {
+    let args = Cli::parse();
+    if let Commands::Solve { path: file_path } = args.command {
+        //if true {
+        let grid = match parse(&file_path) {
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
-        let mut solver = Solver::new(grid, debug);
-        if hard_solve {
-            match solver.hard_solve() {
-                SolveResult::FailedSolve => return Err("could not solve".to_string()),
-                SolveResult::ManySolutions => return Err("multiple solutions found".to_string()),
-                _ => {}
-            }
-        } else if solver.solve() == SolveResult::FailedSolve {
-            return Err("could not solve".to_string());
+        let mut solver = Solver::new(grid);
+        match solver.hard_solve() {
+            SolveResult::FailedSolve => return Err("could not solve".to_string()),
+            SolveResult::ManySolutions => return Err("multiple solutions found".to_string()),
+            _ => {}
         }
+
         println!("SOLVED: ");
         pretty_print(&solver.get_solved().unwrap());
-    } else if command == "check" {
-        let grid = match parse(&file_path.unwrap()) {
+    } else if let Commands::Check { path: file_path } = args.command {
+        let grid = match parse(&file_path) {
             Ok(val) => val,
             Err(e) => return Err(e.to_string()),
         };
-        if debug || hard_solve {
-            return Err(format!("can not use that option with this command"));
-        }
         match check_grid(&grid) {
             true => println!("The given grid is correct."),
             false => println!("The given grid is incorrect"),
         }
-    } else if command == "create" {
-        if debug || hard_solve {
-            return Err(format!("can not use that option with this command"));
-        }
+    } else if let Commands::Create = args.command {
         let now = Instant::now();
         let grid = create_grid();
         pretty_print(&grid);
